@@ -1,5 +1,6 @@
 import streamlit as st
 from PyPDF2 import PdfReader
+from docx import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 import pytesseract
@@ -38,6 +39,29 @@ def extract_text_from_pdf(pdfs):
 
     return text.strip()
 
+# Function to extract text from Word files (.docx)
+def extract_text_from_word(word_files):
+    """Extract text from .docx files."""
+    text = ""
+    for word_file in word_files:
+        doc = Document(word_file)
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+    return text.strip()
+
+# Function to handle both PDFs and Word files
+def extract_text_from_documents(files):
+    """Extract text from PDFs and Word documents."""
+    text = ""
+    
+    for file in files:
+        if file.name.endswith(".pdf"):
+            text += extract_text_from_pdf([file])
+        elif file.name.endswith(".docx"):
+            text += extract_text_from_word([file])
+    
+    return text.strip()
+
 # Function to split text into chunks
 def get_text_chunks(text):
     """Split text into chunks for better processing."""
@@ -70,7 +94,7 @@ def get_conversational_chain():
 def user_input(user_question, chat_history):
     """Process user queries and generate responses."""
     if st.session_state.vector_store is None:
-        st.warning("Please upload and process PDFs first.")
+        st.warning("Please upload and process documents first.")
         return chat_history
 
     docs = st.session_state.vector_store.similarity_search(user_question)
@@ -106,7 +130,7 @@ def main():
     st.set_page_config(page_title='QueryBot', layout='wide')
     st.markdown("""
         <h1 style='text-align: center;'>📚 QueryBot</h1>
-        <p style='text-align: center;'>Upload Document and ask questions interactively.</p>
+        <p style='text-align: center;'>Upload Documents and ask questions interactively.</p>
     """, unsafe_allow_html=True)
     
     if 'chat_history' not in st.session_state:
@@ -122,11 +146,11 @@ def main():
     
     with st.sidebar:
         st.title('📂 Document Upload & Processing')
-        pdf_docs = st.file_uploader('Upload your Files and Click on Submit & Process', accept_multiple_files=True, type=["pdf"])
+        documents = st.file_uploader('Upload your Files and Click on Submit & Process', accept_multiple_files=True, type=["pdf", "docx"])
         
         if st.button('Submit & Process', key="process"):
-            with st.spinner("Processing PDF..."):
-                raw_text = extract_text_from_pdf(pdf_docs)
+            with st.spinner("Processing Documents..."):
+                raw_text = extract_text_from_documents(documents)
                 text_chunks = get_text_chunks(raw_text)
                 st.session_state.vector_store = get_vector_store(text_chunks=text_chunks)
                 st.success('Processing Complete! You can now ask questions.')
